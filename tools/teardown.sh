@@ -1,0 +1,2 @@
+docker container rm teamj-mongo energyreserve teamjrabbitmq electricmeterregister teamj-jydrosupplier-host teamj-jcoalsupplier-host energymonitorservice supplierorchestratorhost customerservicehost demo-runner-host teamj-soa-energy-supplier-service
+docker image rm soa-supplier-orchestrator-service demo-runner teamj-soa-energy-supplier-service teamj-soa-electric-metere-register-service teamj-soa-energy-monitor-service soa-supplier-orchestrator-service teamj-soa-customer-service

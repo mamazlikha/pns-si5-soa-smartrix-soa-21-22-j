@@ -1,0 +1,99 @@
+version: "3.5"
+services:
+  mongo:
+    image: mongo:5.0
+    container_name: teamj-mongo
+    hostname: mongo
+    restart: unless-stopped
+    healthcheck:
+      start_period: 30s
+    command: --syslog
+
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: teamjrabbitmq
+
+  energymonitorservice:
+    image: teamj-soa-energy-monitor-service
+    container_name: energymonitorservice
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "8081"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - PORT=8081
+
+
+  customerservice:
+    image: teamj-soa-customer-service
+    container_name: customerservicehost
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "8080"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=$MONGO_HOST_PORT
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - ENERGY_MONITOR_URL=http://energymonitorservice:8081
+      - PORT=8080
+  
+  emailservice:
+    image: teamj-soa-emailservice
+    container_name: emailservicehost
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "8085"
+    environment:
+      - PORT=8085
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=$MONGO_HOST_PORT
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+
+  supplierorchestrator:
+    image: teamj-soa-orchestrator
+    container_name: supplierorchestratorhost
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "8082"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=$MONGO_HOST_PORT
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - PORT=8082
+
+  testrunner:
+    image: teamj-soa-testrunner
+    container_name: testrunnerhost
+    depends_on:
+      - rabbitmq
+      - mongo
+      - customerservice
+      - emailservice
+    environment:
+      - API_CUSTOMERS_HOST=customerservicehost
+      - API_CUSTOMERS_PORT=8080
+      - EMAIL_SERVICE_HOST=emailservicehost
+      - EMAIL_SERVICE_PORT=8085
+      - ORCHESTRATOR_SERVICE_HOST=supplierorchestratorhost
+      - ORCHESTRATOR_SERVICE_PORT=8082
+      

@@ -1,0 +1,259 @@
+version: "3.5"
+services:
+  mongo:
+    image: mongo:5.0
+    container_name: teamj-mongo
+    hostname: mongo
+    command: --syslog
+
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: teamjrabbitmq
+    
+  # See:
+# https://hub.docker.com/r/bitnami/zookeeper
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    container_name: teamjzookeeper
+    expose:
+      - "2181"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: teamjkafka
+    expose:
+      - "9092"
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_LISTENERS=PLAINTEXT://:9092
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://teamjkafka:9092
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+    depends_on:
+      - zookeeper
+
+  customerservice:
+    image: teamj-soa-customer-service
+    container_name: customerservicehost
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "8080"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - ENERGY_MONITOR_URL=http://energymonitorservice:8081
+      - ACCOUNTING_SERVICE_URL=http://accountinghost:5007
+      - LOCAL_PRODUCTION_SERVICE_URL=http://localproductionmonitor:8083
+      - PORT=8080
+  
+  bankservice:
+    image: teamj-soa-bankservice
+    container_name: bankservicehost
+    expose:
+      - "5006"
+    environment:
+      - PORT=5006
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+
+  accounting:
+    image: teamj-soa-accounting
+    container_name: accountinghost
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "5007"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - EXTERNAL_BANK_API=http://bankservicehost:5006
+      - PORT=5007
+      - MEASURES_MONITOR_URL=http://energymonitorservice:8081
+
+  energymonitorservice:
+    image: teamj-soa-energy-monitor-service
+    container_name: energymonitorservice
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "8081"
+    environment:
+      - KAFKA_SERVER_HOST=teamjkafka
+      - KAFKA_SERVER_PORT=9092
+      - KAFKA_SERVER_URL=http://teamjkafka:9092
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - PORT=8081
+      - ACCOUNTING_SERVICE_URL=http://accountinghost:5007
+
+  supplierorchestrator:
+      image: teamj-soa-orchestrator
+      container_name: supplierorchestratorhost
+      depends_on:
+        - rabbitmq
+        - mongo
+      expose:
+        - "8082"
+      environment:
+        - RABBIT_HOST=teamjrabbitmq
+        - SPRING_DATA_MONGODB_HOST=mongo
+        - SPRING_DATA_MONGODB_PORT=27017
+        - PLAY_MODE=DEMO
+        - SCHEDULING_ENABLED=false
+        - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+        - CONSUMPTION_MONITOR_URL=http://energymonitorservice:8081
+        - PORT=8082
+
+  emailservice:
+    image: teamj-soa-emailservice
+    container_name: emailservicehost
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "8085"
+    environment:
+      - PORT=8085
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+
+  energyreserve:
+    image: teamj-soa-energyreserve
+    container_name: energyreservehost
+    depends_on:
+      - rabbitmq
+      - mongo
+      - kafka
+    expose:
+      - "5006"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - PORT=5006
+      - KAFKA_SERVER_HOST=teamjkafka
+      - KAFKA_SERVER_PORT=9092
+      - KAFKA_SERVER_URL=http://teamjkafka:9092
+
+  localproductionmonitor:
+    image: teamj-soa-local-production-monitor-service
+    container_name: localproductionmonitor
+    restart: on-failure
+    depends_on:
+      - energymonitorservice
+      - mongo
+    expose:
+      - "8083"
+    environment:
+      - KAFKA_SERVER_HOST=teamjkafka
+      - KAFKA_SERVER_PORT=9092
+      - KAFKA_SERVER_URL=http://teamjkafka:9092
+      - ENERGY_MONITOR_URL=http://energymonitorservice:8081
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - ACCOUNTING_SERVICE_URL=http://accountinghost:5007
+      - PORT=8083
+
+
+  jydrosupplier:
+      image: teamj-soa-energy-supplier-service
+      container_name: teamj-jydrosupplier-host
+      restart: on-failure
+      depends_on:
+        - rabbitmq
+        - mongo
+        - supplierorchestrator
+      environment:
+        - RABBIT_HOST=teamjrabbitmq
+        - SPRING_DATA_MONGODB_HOST=mongo
+        - SPRING_DATA_MONGODB_PORT=27017
+        - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+        - PORT=4201
+        - SUPPLIER_DB_NAME=jydrodb
+        - SUPPLIER_NAME=Jydro
+        - SUPPLIER_CAPACITY=10000
+        - SUPPLIER_REGION=A
+        - API_ORCHESTRATOR_URL=http://supplierorchestratorhost:8082
+
+  jcoalsupplier:
+    image: teamj-soa-energy-supplier-service
+    container_name: teamj-jcoalsupplier-host
+    restart: on-failure
+    depends_on:
+      - rabbitmq
+      - mongo
+      - supplierorchestrator
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - PORT=4202
+      - SUPPLIER_DB_NAME=jcoaldb
+      - SUPPLIER_NAME=JCoal
+      - SUPPLIER_CAPACITY=10000
+      - SUPPLIER_REGION=C
+      - API_ORCHESTRATOR_URL=http://supplierorchestratorhost:8082
+
+  testrunner:
+    image: teamj-soa-runner
+    container_name: testrunnerhost
+    depends_on:
+      - rabbitmq
+      - mongo
+      - accounting
+      - bankservice
+      - customerservice
+      - energymonitorservice
+      - energyreserve
+      - emailservice
+      - supplierorchestrator
+    volumes:
+      - ./demodata:/demodata
+    environment:
+      - MONGO_HOST=mongo
+      - MONGO_PORT=27017
+      - API_CUSTOMERS_HOST=customerservicehost
+      - API_CUSTOMERS_PORT=8080
+      - BANK_SERVICE_HOST=bankservicehost
+      - BANK_SERVICE_PORT=5006
+      - ACCOUNTING_SERVICE_HOST=accountinghost
+      - ACCOUNTING_SERVICE_PORT=5007
+      - ENERGY_MONITOR_HOST=energymonitorservice
+      - ENERGY_MONITOR_PORT=8081
+      - API_MEASURES_HOST=energymonitorservice
+      - API_MEASURES_PORT=8081
+      - ORCHESTRATOR_SERVICE_HOST=supplierorchestratorhost
+      - ORCHESTRATOR_SERVICE_PORT=8082
+      - API_ORCHESTRATOR_URL=http://supplierorchestratorhost:8082
+      - EMAIL_SERVICE_HOST=emailservicehost
+      - EMAIL_SERVICE_PORT=8085
+      - LOCAL_PRODUCTION_MONITOR_HOST=localproductionmonitor
+      - LOCAL_PRODUCTION_MONITOR_PORT=8083

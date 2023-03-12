@@ -1,0 +1,18 @@
+FROM python:3.8-bullseye
+
+WORKDIR /app
+
+
+COPY . .
+
+#RUN apt-get update && apt-get install python-dateutil
+
+RUN curl -o database-tools.deb https://fastdl.mongodb.org/tools/db/mongodb-database-tools-debian10-x86_64-100.5.1.deb
+
+RUN apt install ./database-tools.deb
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install -r requirements.txt
+
+RUN chmod +x start.data.sh
+
+ENTRYPOINT [ "./start.data.sh" ] 

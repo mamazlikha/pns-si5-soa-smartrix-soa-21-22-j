@@ -1,0 +1,93 @@
+version: "3.5"
+services:
+  mongo:
+    image: mongo:5.0
+    container_name: teamj-mongo
+    hostname: mongo
+    restart: unless-stopped
+    healthcheck:
+      start_period: 30s
+    command: ["--quiet","--bind_ip", "0.0.0.0"]
+
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: teamjrabbitmq
+
+
+  customerservice:
+    image: teamj-soa-customer-service
+    container_name: customerservicehost
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "8080"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - PORT=8080
+  
+  bankservice:
+    image: teamj-soa-bankservice
+    container_name: bankservicehost
+    expose:
+      - "5006"
+    environment:
+      - PORT=5006
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+
+  accounting:
+    image: teamj-soa-accounting
+    container_name: accountinghost
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "5007"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - EXTERNAL_BANK_API=http://bankservicehost:5006
+      - PORT=5007
+
+  energyreserve:
+    image: teamj-soa-energyreserve
+    container_name: energyreservehost
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "5006"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - PORT=5006
+
+  testrunner:
+    image: teamj-soa-us9-runner
+    container_name: us9testrunnerhost
+    depends_on:
+      - rabbitmq
+      - mongo
+      - accounting
+      - bankservice
+      - customerservice
+      - energyreserve
+    environment:
+      - API_CUSTOMERS_HOST=customerservicehost
+      - API_CUSTOMERS_PORT=8080
+      - BANK_SERVICE_HOST=bankservicehost
+      - BANK_SERVICE_PORT=5006
+      - ACCOUNTING_SERVICE_HOST=accountinghost
+      - ACCOUNTING_SERVICE_PORT=5007
+      

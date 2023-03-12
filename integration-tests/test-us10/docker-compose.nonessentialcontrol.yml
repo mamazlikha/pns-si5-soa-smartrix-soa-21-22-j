@@ -1,0 +1,67 @@
+version: "3.5"
+services:
+  mongo:
+    image: mongo:5.0
+    container_name: teamj-mongo
+    hostname: mongo
+    restart: unless-stopped
+    healthcheck:
+      start_period: 30s
+    command: ["--quiet","--bind_ip", "0.0.0.0"]
+
+  rabbitmq:
+    image: rabbitmq:3.9-management
+    container_name: teamjrabbitmq
+#    ports:
+#      - "5672:5672" #JMS Port
+#      - "15672:15672" #Management Port - default user:pass = guest:guest
+
+
+  customerservice:
+    image: teamj-soa-customer-service
+    container_name: customerservicehost
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "8080"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - PORT=8080
+
+  energymonitorservice:
+    image: teamj-soa-energy-monitor-service
+    container_name: energymonitorservice
+    depends_on:
+      - rabbitmq
+      - mongo
+    expose:
+      - "8081"
+    environment:
+      - RABBIT_HOST=teamjrabbitmq
+      - SPRING_DATA_MONGODB_HOST=mongo
+      - SPRING_DATA_MONGODB_PORT=27017
+      - PLAY_MODE=DEMO
+      - SCHEDULING_ENABLED=false
+      - LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_WEB=OFF
+      - PORT=8081
+
+  testrunner:
+    image: teamj-soa-us10-runner
+    container_name: us10testrunnerhost
+    depends_on:
+      - rabbitmq
+      - mongo
+      - customerservice
+      - energymonitorservice
+    environment:
+      - API_CUSTOMERS_HOST=customerservicehost
+      - API_CUSTOMERS_PORT=8080
+      - ENERGY_MONITOR_HOST=energymonitorservice
+      - ENERGY_MONITOR_PORT=8081
+

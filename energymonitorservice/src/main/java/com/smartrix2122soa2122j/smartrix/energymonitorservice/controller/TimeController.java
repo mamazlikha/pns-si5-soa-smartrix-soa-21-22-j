@@ -1,0 +1,26 @@
+package com.smartrix2122soa2122j.smartrix.energymonitorservice.controller;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+
+import com.smartrix2122soa2122j.smartrix.energymonitorservice.component.ClockWrapper;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class TimeController {
+
+    @Autowired
+    private ClockWrapper wrapper;
+
+    @GetMapping("/admin/time/{clockReference}")
+    public void changeClock(@PathVariable("clockReference") String clockStr) {
+        this.wrapper.setClock(Clock.fixed(Instant.parse(clockStr), ZoneOffset.ofHours(0)));
+
+    }
+
+}
